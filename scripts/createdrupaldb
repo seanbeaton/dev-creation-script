@@ -1,0 +1,82 @@
+#!/bin/bash
+
+SCRIPTS_DIR="$(dirname "$(readlink "$0")")"
+
+source "$SCRIPTS_DIR/../settings/settings.conf";
+
+# arg 1: project name
+# arg 2: db user name (for db)
+# arg 3: mysql user
+# arg 4: mysql pw
+# arg 5: default script location
+# arg 6: db scripts location
+# arg 7: script dir
+
+if [ "$1" != "" ]; then
+	DB_NAME_CLEAN=$1
+else
+	DB_NAME_CLEAN='default'
+	while :
+	do
+		read -p "Project name not provided, please provide it now: " answer
+		if [ "$answer" != "" ]; then
+			CLEAN=$( echo "$answer" | sed "s/[\.-]/_/g" )
+			read -p "Using $CLEAN as the database name, is this ok? (y/n) " continuecreation
+			if [ "$continuecreation" == "y" ]; then
+				DB_NAME_CLEAN=$answer
+				break
+			else
+				echo "Try another database name."
+			fi
+		fi
+	done
+fi
+
+if [ "$2" != "" ]; then
+	DB_USER=$2
+else
+	read -p "Dev Myqsl user not provided, please provide it now, or enter to accept the default. Default: ($DB_USER) " answer
+	if [ "$answer" != "" ]; then
+		DB_USER=$answer
+	fi
+fi
+
+if [ "$3" != "" ]; then
+	MYSQL_USER=$3
+else
+	read -p "Mysql user not provided, please provide it now, or enter to accept the default. Default: ($MYSQL_USER) " answer
+	if [ "$answer" != "" ]; then
+		MYSQL_USER=$answer
+	fi
+fi
+
+if [ "$4" != "" ]; then
+	MYSQL_PASS=$4
+else
+	read -s -p "Mysql pw for $MYSQL_USER not provided, please provide it now: " MYSQL_PASS
+fi
+
+if [ "$5" != "" ]; then
+	DEFAULT_DB_SCRIPT=$5
+else
+	DEFAULT_DB_SCRIPT='/app/dev-creation-script/resources/default.database_create.sql'
+	read -p "Default db creation script not provided, please provide it now, or enter to accept the default. Default: ($DEFAULT_DB_SCRIPT) " answer
+	if [ "$answer" != "" ]; then
+		DEFAULT_DB_SCRIPT=$answer
+	fi
+fi
+
+if [ "$6" != "" ]; then
+	DB_SCRIPT_LOCATION=$6
+else
+	DB_SCRIPT_LOCATION='/app/dev-creation-script/resources/projects'
+	read -p "Db creation script directory not provided Default: ($DB_SCRIPT_LOCATION) " answer
+	if [ "$answer" != "" ]; then
+		DB_SCRIPT_LOCATION=$answer
+	fi
+fi
+
+PROJECT_SCRIPT_LOCATION="$DB_SCRIPT_LOCATION/$DB_NAME_CLEAN.database_create.sql"
+
+sed "s/TMP_DEV_DB_NAME/$DB_NAME_CLEAN/g" "$DEFAULT_DB_SCRIPT" | sed "s/TMP_DEV_USERNAME/$DB_USER/g" > "$PROJECT_SCRIPT_LOCATION"
+mysql -u $MYSQL_USER -p$MYSQL_PASS < "$PROJECT_SCRIPT_LOCATION"

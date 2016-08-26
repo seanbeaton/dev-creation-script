@@ -1,0 +1,43 @@
+#!/bin/sh
+
+file='/app/apache2/conf/vhosts/'
+
+if [ "$1" != "" ]; then
+	sitename=$1
+else
+	read -p "Name of dir not provided. Please provide it now: " sitename
+fi
+
+if [ "$2" != "" ]; then
+	website=$2
+else
+	read -p "Name of live site not provided. Please provide it now. " website
+fi
+
+if [ "$3" != "" ]; then
+	webdir=$3
+else
+	echo 'Assuming dir is htdocs...'
+	webdir='htdocs'
+fi
+
+echo "Creating Conf file for: $sitename\t\nWith site name: \t$website"
+
+echo '<VirtualHost *:80>\n\tServerAdmin webmaster@seanbeaton.com\n\tDocumentRoot /app/'"$sitename"'/'"$webdir"'\n\tServerName '"$sitename"'.home.seanbeaton.com\n\tErrorLog /app/'"$sitename"'/logs/error_log\n\tCustomLog /app/'"$sitename"'/logs/access_log common\n\tphp_value error_log "/app/'"$sitename"'/logs/php-errors.log"\n\tphp_value error_reporting 6135\n\tDirectoryIndex index.php index.html\n\t<Directory "/app/'"$sitename"'/'"$webdir"'">\n\t\tOptions Indexes FollowSymLinks\n\t\tAllowOverride All\n\t\tOrder allow,deny\n\t\tAllow from all\n\t</Directory>' > "$file$sitename.conf"
+
+echo '\n\tRewriteEngine On'  >> "$file$sitename.conf"
+echo '\t# Force image styles that have local files that exist to be generated.'  >> "$file$sitename.conf"
+echo '\tRewriteCond %{REQUEST_URI} ^/sites/([^\\/]*)/files/styles/[^\\/]*/public/((.*))$'  >> "$file$sitename.conf"
+echo '\tRewriteCond %{DOCUMENT_ROOT}/sites/%1/files/%2 -f' >> "$file$sitename.conf"
+echo '\tRewriteRule ^(.*)$ $1 [QSA,L]'  >> "$file$sitename.conf"
+echo '\t# Otherwise, send anything else in the files directory to the' >> "$file$sitename.conf"
+echo '\t# production server.' >> "$file$sitename.conf"
+echo '\tRewriteCond %{REQUEST_URI} ^/sites/[^\\/]*/files/.*$' >> "$file$sitename.conf"
+echo '\tRewriteCond %{REQUEST_URI} !^/sites/[^\\/]*/files/css/.*$' >> "$file$sitename.conf"
+echo '\tRewriteCond %{REQUEST_URI} !^/sites/[^\\/]*/files/js/.*$' >> "$file$sitename.conf"
+echo '\tRewriteCond %{DOCUMENT_ROOT}%{REQUEST_FILENAME} !-f' >> "$file$sitename.conf"
+echo '\tRewriteCond %{DOCUMENT_ROOT}%{REQUEST_FILENAME} !-d' >> "$file$sitename.conf"
+echo '\tRewriteRule ^(.*)$ http://'"$website"'$1 [QSA,L]' >> "$file$sitename.conf"
+echo '</VirtualHost>' >> "$file$sitename.conf"
+
+exit 0

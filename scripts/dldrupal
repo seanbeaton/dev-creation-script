@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# arg 1: Drupal version
+# arg 2: Download location
+
+if [ "$1" != "" ]; then
+	VERSION=$1
+else
+	read -p "Drupal Version not provided, please provide it now: " VERSION
+fi
+
+if [ "$2" != "" ]; then
+	DLLOC=$2
+else
+	read -p "Download Location not provided, please provide it now: " DLLOC
+fi
+
+CURRENT_DIR=pwd
+cd $DLLOC
+echo "Downloading drupal version $VERSION to $2"
+wget $(echo "https://www.drupal.org/files/projects/drupal-$VERSION.tar.gz") -q --show-progress
+tar -xzf $(echo "drupal-$1.tar.gz")
+mv "$DLLOC/drupal-$VERSION"/{.[!.],}* "$2" # Move all files and hidden files
+rm -r "$DLLOC/drupal-$VERSION"
+rm "$DLLOC/drupal-$VERSION.tar.gz"
+echo "Project files downloaded."
+cd "$CURRENT_DIR"
+exit 0

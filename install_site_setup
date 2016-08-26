@@ -1,0 +1,36 @@
+#!/bin/bash
+CURRENT_DIR=$(pwd)
+SCRIPT_LOCATION='~/bin'
+
+read -p "Enter the location you'd like to add the script files to. Default: ($SCRIPT_LOCATION) " answer
+if [ "$answer" != "" ]; then
+	$SCRIPT_LOCATION=answer
+fi
+
+INSTALLER_DIR="`dirname \"$0\"`"
+INSTALLER_DIR="`cd \"$INSTALLER_DIR\" && pwd`"
+
+if [ -z "$INSTALLER_DIR" ]; then
+	"Can't find current directory"
+	exit 1
+fi
+
+echo "These files will be linked to from $HOME/bin"
+ls -1 ./scripts
+ls -1 sitesetup
+read -p "Would you like to replace these script files without confirmation? (y/n) " replace
+
+if [ $replace == "y" ]; then
+	ln -Fs $INSTALLER_DIR/sitesetup $INSTALLER_DIR/scripts/* $( echo $SCRIPT_LOCATION | sed s$'\001''~'$'\001'"$HOME"$'\001''g')
+else
+	ln -is $INSTALLER_DIR/sitesetup $INSTALLER_DIR/scripts/* $( echo $SCRIPT_LOCATION | sed s$'\001''~'$'\001'"$HOME"$'\001''g')
+fi
+
+cp resources/default.settings.conf settings/settings.conf
+
+echo "DEFAULT_DB_SCRIPT='/app/dev-creation-script/resources/default.database_create.sql'" >> settings/settings.conf
+echo "DB_SCRIPT_LOCATION='/app/dev-creation-script/resources/projects'" >> settings/settings.conf
+
+echo "You will need to add the correct settings in $INSTALLER_DIR/settings/settings.conf"
+
+cd "$CURRENT_DIR"
