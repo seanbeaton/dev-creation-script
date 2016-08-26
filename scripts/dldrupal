@@ -15,12 +15,19 @@ else
 	read -p "Download Location not provided, please provide it now: " DLLOC
 fi
 
-CURRENT_DIR=pwd
+CURRENT_DIR=$(pwd)
+DLLOC=$( echo $DLLOC | sed s$'\001''~'$'\001'"$HOME"$'\001''g')
 cd $DLLOC
-echo "Downloading drupal version $VERSION to $2"
+echo "Downloading drupal version $VERSION to $DLLOC"
 wget $(echo "https://www.drupal.org/files/projects/drupal-$VERSION.tar.gz") -q --show-progress
-tar -xzf $(echo "drupal-$1.tar.gz")
-mv "$DLLOC/drupal-$VERSION"/{.[!.],}* "$2" # Move all files and hidden files
+
+if [ ! -e "drupal-$VERSION.tar.gz" ]; then
+	echo "Couldn't download files. Exiting."
+	exit 1
+fi
+
+tar -xzf $(echo "drupal-$VERSION.tar.gz")
+mv "$DLLOC/drupal-$VERSION"/{.[!.],}* "$DLLOC" # Move all files and hidden files
 rm -r "$DLLOC/drupal-$VERSION"
 rm "$DLLOC/drupal-$VERSION.tar.gz"
 echo "Project files downloaded."
