@@ -2,7 +2,6 @@
 
 BASE_DIR="$(dirname "$(readlink "$0")")"
 
-echo "$BASE_DIR"
 source "$BASE_DIR/settings/settings.conf";
 
 ALLOW_APACHE_CONF_CREATE=0
