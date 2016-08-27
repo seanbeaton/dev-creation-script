@@ -3,15 +3,34 @@
 # arg 1: Drupal version
 # arg 2: Download location
 
-if [ "$1" != "" ]; then
-	VERSION=$1
-else
+VERSION=''
+DLLOC=''
+
+while [[ $# -gt 0 ]]
+do
+	key="$1"
+	case $key in
+		-v|--download-version)
+		VERSION=$2
+		shift
+		;;
+		-l|--download-location)
+		DLLOC=$2
+		shift
+		;;
+		*)
+		echo "dldrupal: unknown option " $1
+		exit 1
+		;;
+	esac
+	shift
+done
+
+if [ "$VERSION" == "" ]; then
 	read -p "Drupal Version not provided, please provide it now: " VERSION
 fi
 
-if [ "$2" != "" ]; then
-	DLLOC=$2
-else
+if [ "$DLLOC" == "" ]; then
 	read -p "Download Location not provided, please provide it now: " DLLOC
 fi
 
