@@ -8,16 +8,17 @@ ALLOW_APACHE_CONF_CREATE=0
 DRUPAL_PROJECT="n" # This'll be set to "y" later if we download the files.
 GIT_REGEX=$(echo "git@[a-zA-z\_\.-]+\:[a-zA-z\_\.-]+\/([a-zA-z\_\.-]+).git")
 VERSION_REGEX=$(echo "^([1-9A-Za-z]+)[\.|$]") #match the first number in a version number
+DB_NAME_REGEX=$(echo "[\"\'\%\$\#\@\.-]") #match the first number in a version number
 ALLOW_PROJECT_FILES_SETUP=0 # This is used to see if we can download the files for drupal/whatever project
 CURRENT_DIR=`pwd`
 
 while :
 do
 	read -p "Is there a current live site? (y/n) " ANSWER
-	if [ $ANSWER == "y" ]; then
+	if [ "$ANSWER" == "y" ]; then
   		read -p "Enter the url, without the protocol and ending slash: " CURR_LIVE_SITE
 		break
-	elif [ $ANSWER == "n" ]; then
+	elif [ "$ANSWER" == "n" ]; then
 		CURR_LIVE_SITE='example.com'
 		break
 	fi
@@ -26,19 +27,19 @@ done
 while :
 do
 	read -p "Does the directory for this project already exist? (y/n) " ANSWER
-	if [ $ANSWER == "y" ]; then
+	if [ "$ANSWER" == "y" ]; then
 		ALLOW_APACHE_CONF_CREATE=1;
   		read -p "Enter the directory name for this project: " PROJ_DIR_NAME
   		read -p "If the site root directory isn't htdocs, enter it now: " INPUT_SITE_ROOT
-		if [ $INPUT_SITE_ROOT != "" ]; then
+		if [ "$INPUT_SITE_ROOT" != "" ]; then
 		  SITE_ROOT=$INPUT_SITE_ROOT
 		fi
 		break
-	elif [ $ANSWER == "n" ]; then
+	elif [ "$ANSWER" == "n" ]; then
 		while :
 		do
 			read -p "Does a repository for this project currently exist? (y/n) " ANSWER
-			if [ $ANSWER == "y" ]; then
+			if [ "$ANSWER" == "y" ]; then
 				cd "$PROJECTS_ROOT/"
 				while :
 				do
@@ -54,11 +55,11 @@ do
 					fi
 				done
 				break
-			elif [ $ANSWER == "n" ]; then
+			elif [ "$ANSWER" == "n" ]; then
 				while :
 				do
 					read -p "Do you want to create the directory structure? (y/n) " ANSWER
-					if [ $ANSWER == "y" ]; then
+					if [ "$ANSWER" == "y" ]; then
 						read -p "Enter the directory name for this project: " PROJ_DIR_NAME
 						mkdir "$PROJECTS_ROOT/$PROJ_DIR_NAME"
 						mkdir "$PROJECTS_ROOT/$PROJ_DIR_NAME/$SITE_ROOT"
@@ -69,7 +70,7 @@ do
 						git init "$PROJECTS_ROOT/$PROJ_DIR_NAME"
 						INPUT_SITE_ROOT='htdocs'
 						break
-					elif [ $ANSWER == "n" ]; then
+					elif [ "$ANSWER" == "n" ]; then
 						break
 					fi
 				done
@@ -80,7 +81,7 @@ do
 	fi
 done
 
-if [ $ALLOW_PROJECT_FILES_SETUP == 1 ]; then
+if [ "$ALLOW_PROJECT_FILES_SETUP" == 1 ]; then
 	while :
 	do
 		echo "What kind of project do you want to create?"
@@ -94,7 +95,7 @@ if [ $ALLOW_PROJECT_FILES_SETUP == 1 ]; then
 				dldrupal --download-version "$DRUPAL_VERSION" --download-location "$PROJECTS_ROOT/$PROJ_DIR_NAME/$SITE_ROOT"
 				DRUPAL_PROJECT="y";
 				[[ "$DRUPAL_VERSION" =~ $(echo "$VERSION_REGEX") ]]
-				DRUPAL_MAJOR_VERSION= $(echo "${BASH_REMATCH[1]}")
+				DRUPAL_MAJOR_VERSION=$(echo "${BASH_REMATCH[1]}")
 				PROJECT_CREATED="y";
 				;;
 			1) # No project files
@@ -109,19 +110,21 @@ if [ $ALLOW_PROJECT_FILES_SETUP == 1 ]; then
 				echo "That wasn't one of the options..."
 				;;
 		esac
-		if [ $PROJECT_CREATED == "y" ]; then
+		if [ "$PROJECT_CREATED" == "y" ]; then
 			break
 		fi
 	done
 fi
 
+PROJECT_NAME=$PROJ_DIR_NAME
+
 while :
 do
 	read -p "Do you want to set up the drushrc and settings files? (y/n) " ANSWER
-	if [ $ANSWER == "y" ]; then
+	if [ "$ANSWER" == "y" ]; then
 
 		break
-	elif [ $ANSWER == "n" ]; then
+	elif [ "$ANSWER" == "n" ]; then
 		break
 	fi
 done
@@ -129,43 +132,54 @@ done
 while :
 do
 	read -p "Update /etc/hosts file? (y/n) " ANSWER
-	if [ $ANSWER == "y" ]; then
-		sudo echo "127.0.0.1      $PROJECT_NAME.home.seanbeaton.com" >> $ETC_HOSTS_PATH
+	BASE_SITE_DOMAIN=''
+	if [ "$ANSWER" == "y" ]; then
+		read -p "Enter the base site domain for this project, or hit enter to use $PROJ_DIR_NAME(.$DEV_SITE_DOMAIN): " BASE_SITE_DOMAIN
+		echo "sudo needed to edit $ETC_HOSTS_PATH..."
+		sudo -v
+		if [ "$BASE_SITE_DOMAIN" != "" ]; then
+			echo "127.0.0.1      $BASE_SITE_DOMAIN.$DEV_SITE_DOMAIN" | sudo tee -a $ETC_HOSTS_PATH > /dev/null
+		else
+			echo "127.0.0.1      $PROJ_DIR_NAME.$DEV_SITE_DOMAIN" | sudo tee -a $ETC_HOSTS_PATH > /dev/null
+			$BASE_SITE_DOMAIN=PROJ_DIR_NAME
+		fi
 		break
-	elif [ $ANSWER == "n" ]; then
+	elif [ "$ANSWER" == "n" ]; then
 		break
 	fi
 done
 
-if [ $ALLOW_APACHE_CONF_CREATE == 1 ]; then
+if [ "$ALLOW_APACHE_CONF_CREATE" == 1 ]; then
 	while :
 	do
 		read -p "Create apache config files? (y/n) " ANSWER
-		if [ $ANSWER == "y" ]; then
-			createapacheconf --directory "$PROJECT_NAME" --live-site "$CURR_LIVE_SITE" --site-root "$SITE_ROOT"
+		if [ "$ANSWER" == "y" ]; then
+			createapacheconf --directory "$PROJECT_NAME" --live-site "$CURR_LIVE_SITE" --site-root "$SITE_ROOT" --dev-site "$BASE_SITE_DOMAIN"
 			break
-		elif [ $ANSWER == "n" ]; then
+		elif [ "$ANSWER" == "n" ]; then
 			break
 		fi
 	done
 fi
 
-DRUPAL_PROJECT="y";
-if [ $DRUPAL_PROJECT == "y" ]; then
-	PROJECT_NAME=$PROJ_DIR_NAME
+if [ "$DRUPAL_PROJECT" == "y" ]; then
 	while :
 	do
 		read -p "Do you want to create a mysql database for this site? (y/n) " ANSWER
-		if [ $ANSWER == "y" ]; then
-			DB_NAME_CLEAN=$( echo "$PROJECT_NAME" | sed "s/[\.-]/_/g" )
+		if [ "$ANSWER" == "y" ]; then
+			DB_NAME_CLEAN=$( echo "$PROJECT_NAME" | sed "s/$DB_NAME_REGEX/_/g" )
 			if [ "$MYSQL_PW" == "" ]; then
 				read -s -p "Mysql PW was not provided in the settings file, please provide now: " MYSQL_PW
 				echo ""
 			fi
 			createdrupaldb --project-clean "$DB_NAME_CLEAN" --db-user "$DB_USER" --mysql-user "$MYSQL_USER" --mysql-password "$MYSQL_PW" --template-script-location "$DEFAULT_DB_SCRIPT" --db-scripts-location "$DB_SCRIPT_LOCATION"
 			break
-		elif [ $ANSWER == "n" ]; then
+		elif [ "$ANSWER" == "n" ]; then
 			break
 		fi
 	done
 fi
+
+cd "$CURRENT_DIR"
+echo "Done!"
+exit 0
