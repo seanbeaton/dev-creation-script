@@ -43,6 +43,10 @@ Arguments:
 -r | --site-root <htdocs>
 	Sets the docroot of the project.
 
+-s | --dev-site
+	Set the lowest level domain of the site, for example "project"
+	in "project.home.seanbeaton.com"
+
 ### createdrupaldb ###
 
 Creates a drupal database for a specified project.

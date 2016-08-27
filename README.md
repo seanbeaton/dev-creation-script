@@ -40,6 +40,10 @@ Sets the current live site of the site. If there currently isn't a live site, yo
 
 Sets the docroot of the project.
 
+`-s | --dev-site`
+
+Set the lowest level domain of the site, for example `project` in `project.home.seanbeaton.com`
+
 ###createdrupaldb
 Creates a drupal database for a specified project.
 
