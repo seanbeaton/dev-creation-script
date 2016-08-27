@@ -7,6 +7,7 @@ source "$SCRIPTS_DIR/../settings/settings.conf";
 PROJ_DIR_NAME=""
 LIVE_WEBSITE=""
 SITE_ROOT=""
+BASE_SITE_DOMAIN=""
 
 while [[ $# -gt 0 ]]
 do
@@ -24,6 +25,10 @@ do
 		SITE_ROOT=$2
 		shift
 		;;
+		-s|--dev-site)
+		BASE_SITE_DOMAIN=$2
+		shift
+		;;
 		*)
 		echo "createapacheconf: unknown option " $1
 		exit 1
@@ -36,6 +41,15 @@ if [ "$PROJ_DIR_NAME" == "" ]; then
 	read -p "Name of dir not provided. Please provide it now: " PROJ_DIR_NAME
 fi
 
+if [ "$BASE_SITE_DOMAIN" == "" ]; then
+	read -p "Local dev site domain not provided. Please provide it now, or hit enter for $PROJ_DIR_NAME.$DEV_SITE_DOMAIN: " ANSWER
+	if [ "$ANSWER" == "" ]; then
+		BASE_SITE_DOMAIN=$PROJ_DIR_NAME
+	else
+		BASE_SITE_DOMAIN=$ANSWER
+	fi
+fi
+
 if [ "$LIVE_WEBSITE" == "" ]; then
 	read -p "Url of live site not provided. Please provide it now (without protocol or trailing slash). " LIVE_WEBSITE
 fi
@@ -44,11 +58,11 @@ if [ "$SITE_ROOT" == "" ]; then
 	read -p "Docroot not provided. Please enter the document root of the site: " SITE_ROOT
 fi
 
-CONF_FILE="$APACHE_CONF_DIRECTORY/$PROJ_DIR_NAME.conf"
+CONF_FILE="$APACHE_CONF_DIRECTORY/$BASE_SITE_DOMAIN.conf"
 
 echo "Creating Conf file for: $PROJ_DIR_NAME\t\nWith live site name: \t$LIVE_WEBSITE\t\nIn this location: \t$CONF_FILE"
 
-sed s$'\001''PROJECTS_ROOT'$'\001'"$PROJECTS_ROOT"$'\001''g' "$SCRIPTS_DIR/../resources/default.apache.conf" | sed "s/PROJ_DIR_NAME/$PROJ_DIR_NAME/g" | sed "s/SITE_ROOT/$SITE_ROOT/g" | sed "s/SITE_NAME/$LIVE_WEBSITE/g" | sed "s/DEV_SITE_DOMAIN/$DEV_SITE_DOMAIN/g" > $CONF_FILE
+sed s$'\001''PROJECTS_ROOT'$'\001'"$PROJECTS_ROOT"$'\001''g' "$SCRIPTS_DIR/../resources/default.apache.conf" | sed "s/PROJ_DIR_NAME/$PROJ_DIR_NAME/g" | sed "s/SITE_ROOT/$SITE_ROOT/g" | sed "s/LIVE_WEBSITE/$LIVE_WEBSITE/g" | sed "s/DEV_SITE_DOMAIN/$DEV_SITE_DOMAIN/g" | sed "s/BASE_SITE_DOMAIN/$BASE_SITE_DOMAIN/g" > $CONF_FILE
 
 echo "sudo needed to restart apache..."
 sudo apachectl restart
