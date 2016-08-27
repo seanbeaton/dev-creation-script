@@ -142,7 +142,7 @@ if [ $ALLOW_APACHE_CONF_CREATE == 1 ]; then
 	do
 		read -p "Create apache config files? (y/n) " ANSWER
 		if [ $ANSWER == "y" ]; then
-			createapacheconf "$PROJECT_NAME" "$CURR_LIVE_SITE" "$SITE_ROOT"
+			createapacheconf --directory "$PROJECT_NAME" --live-site "$CURR_LIVE_SITE" --site-root "$SITE_ROOT"
 			break
 		elif [ $ANSWER == "n" ]; then
 			break
@@ -162,7 +162,7 @@ if [ $DRUPAL_PROJECT == "y" ]; then
 				read -s -p "Mysql PW was not provided in the settings file, please provide now: " MYSQL_PW
 				echo ""
 			fi
-			createdrupaldb "$DB_NAME_CLEAN" "$DB_USER" "$MYSQL_USER" "$MYSQL_PW" "$DEFAULT_DB_SCRIPT" "$DB_SCRIPT_LOCATION"
+			createdrupaldb --project-clean "$DB_NAME_CLEAN" --db-user "$DB_USER" --mysql-user "$MYSQL_USER" --mysql-password "$MYSQL_PW" --template-script-location "$DEFAULT_DB_SCRIPT" --db-scripts-location "$DB_SCRIPT_LOCATION"
 			break
 		elif [ $ANSWER == "n" ]; then
 			break
