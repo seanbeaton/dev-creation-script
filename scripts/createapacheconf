@@ -50,4 +50,7 @@ echo "Creating Conf file for: $PROJ_DIR_NAME\t\nWith live site name: \t$LIVE_WEB
 
 sed s$'\001''PROJECTS_ROOT'$'\001'"$PROJECTS_ROOT"$'\001''g' "$SCRIPTS_DIR/../resources/default.apache.conf" | sed "s/PROJ_DIR_NAME/$PROJ_DIR_NAME/g" | sed "s/SITE_ROOT/$SITE_ROOT/g" | sed "s/SITE_NAME/$LIVE_WEBSITE/g" | sed "s/DEV_SITE_DOMAIN/$DEV_SITE_DOMAIN/g" > $CONF_FILE
 
+echo "sudo needed to restart apache..."
+sudo apachectl restart
+
 exit 0
