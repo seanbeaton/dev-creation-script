@@ -5,6 +5,7 @@
 
 VERSION=''
 DLLOC=''
+UNPACK="y"
 
 while [[ $# -gt 0 ]]
 do
@@ -17,6 +18,9 @@ do
 		-l|--download-location)
 		DLLOC=$2
 		shift
+		;;
+		-n|--no-unpack)
+		UNPACK="n"
 		;;
 		*)
 		echo "dldrupal: unknown option " $1
@@ -45,10 +49,14 @@ if [ ! -e "drupal-$VERSION.tar.gz" ]; then
 	exit 1
 fi
 
-tar -xzf $(echo "drupal-$VERSION.tar.gz")
-mv "$DLLOC/drupal-$VERSION"/{.[!.],}* "$DLLOC" # Move all files and hidden files
-rm -r "$DLLOC/drupal-$VERSION"
-rm "$DLLOC/drupal-$VERSION.tar.gz"
 echo "Project files downloaded."
+
+if [ "$UNPACK" == "y" ]; then
+	tar -xzf $(echo "drupal-$VERSION.tar.gz")
+	mv "$DLLOC/drupal-$VERSION"/{.[!.],}* "$DLLOC" # Move all files and hidden files
+	rm -r "$DLLOC/drupal-$VERSION"
+	rm "$DLLOC/drupal-$VERSION.tar.gz"
+fi
+
 cd "$CURRENT_DIR"
 exit 0
