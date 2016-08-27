@@ -56,6 +56,7 @@ if [ "$UNPACK" == "y" ]; then
 	mv "$DLLOC/drupal-$VERSION"/{.[!.],}* "$DLLOC" # Move all files and hidden files
 	rm -r "$DLLOC/drupal-$VERSION"
 	rm "$DLLOC/drupal-$VERSION.tar.gz"
+	echo "Project files unpacked."
 fi
 
 cd "$CURRENT_DIR"
