@@ -49,7 +49,7 @@ Creates a drupal database for a specified project.
 
 Arguments:
 
-`-n | --project-name|--project <my_new_project-4.1.1>`
+`-n | --project-name | --project <my_new_project-4.1.1>`
 
 The name of the project you want to create a database for. Will be escaped.
 
@@ -71,9 +71,9 @@ The password for the mysql user provided by `--mysql-user`.
 
 `-t | --template-script-location </path/to/my/template>`
 
-The location of the template script. This is provided by the settings.conf file, but if you want to structure the default file differently, you can change this variable. The default is usually `/app/dev-creation-script/resources/default.database_create.sql`.
+The location of the template script. This is provided by the settings.conf file, but if you want to structure the default file differently, you can change this variable. The default is usually `resources/default.database_create.sql`.
 
 `-d | --db-scripts-location </path/to/my/location>`
 
-The location for the generated sql scripts. This is provided by the settings.conf file, but if for some reason you want to change this location, you can use this variable. The default is usually `/app/dev-creation-script/resources/projects`.
+The location for the generated sql scripts. This is provided by the settings.conf file, but if for some reason you want to change this location, you can use this variable. The default is usually `resources/projects`.
 
