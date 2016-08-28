@@ -5,12 +5,14 @@ BASE_DIR="$(dirname "$(readlink "$0")")"
 source "$BASE_DIR/settings/settings.conf";
 
 ALLOW_APACHE_CONF_CREATE=0
+ALLOW_DRUPAL_INSTALL="n"
 DRUPAL_PROJECT="n" # This'll be set to "y" later if we download the files.
 GIT_REGEX=$(echo "git@[a-zA-z\_\.-]+\:[a-zA-z\_\.-]+\/([a-zA-z\_\.-]+).git")
 VERSION_REGEX=$(echo "^([1-9A-Za-z]+)[\.|$]") #match the first number in a version number
 DB_NAME_REGEX=$(echo "[\"\'\%\$\#\@\.-]") #match the first number in a version number
 ALLOW_PROJECT_FILES_SETUP=0 # This is used to see if we can download the files for drupal/whatever project
 CURRENT_DIR=`pwd`
+DB_NAME_CLEAN=''
 
 while :
 do
@@ -96,38 +98,24 @@ if [ "$ALLOW_PROJECT_FILES_SETUP" == 1 ]; then
 				DRUPAL_PROJECT="y";
 				[[ "$DRUPAL_VERSION" =~ $(echo "$VERSION_REGEX") ]]
 				DRUPAL_MAJOR_VERSION=$(echo "${BASH_REMATCH[1]}")
-				PROJECT_CREATED="y";
+				break
 				;;
 			1) # No project files
 				echo "Not downloading any project files right now..."
-				PROJECT_CREATED="y";
+				break
 				;;
 			2) # Other Projects
-				echo "You're on your own for this one, bud."
-				PROJECT_CREATED="y";
+				echo "You're on your own for this one."
+				break
 				;;
 			*)
 				echo "That wasn't one of the options..."
 				;;
 		esac
-		if [ "$PROJECT_CREATED" == "y" ]; then
-			break
-		fi
 	done
 fi
 
 PROJECT_NAME=$PROJ_DIR_NAME
-
-while :
-do
-	read -p "Do you want to set up the drushrc and settings files? (y/n) " ANSWER
-	if [ "$ANSWER" == "y" ]; then
-
-		break
-	elif [ "$ANSWER" == "n" ]; then
-		break
-	fi
-done
 
 while :
 do
@@ -141,10 +129,11 @@ do
 			echo "127.0.0.1      $BASE_SITE_DOMAIN.$DEV_SITE_DOMAIN" | sudo tee -a $ETC_HOSTS_PATH > /dev/null
 		else
 			echo "127.0.0.1      $PROJ_DIR_NAME.$DEV_SITE_DOMAIN" | sudo tee -a $ETC_HOSTS_PATH > /dev/null
-			$BASE_SITE_DOMAIN=PROJ_DIR_NAME
+			BASE_SITE_DOMAIN=$PROJ_DIR_NAME
 		fi
 		break
 	elif [ "$ANSWER" == "n" ]; then
+		BASE_SITE_DOMAIN=$PROJ_DIR_NAME
 		break
 	fi
 done
@@ -178,8 +167,79 @@ if [ "$DRUPAL_PROJECT" == "y" ]; then
 			break
 		fi
 	done
+
+	while :
+	do
+		read -p "Do you want to set up the drushrc and settings files? (y/n) " ANSWER
+		if [ "$ANSWER" == "y" ]; then
+
+			if [ "$DB_NAME_CLEAN" == "" ]; then
+				while :
+				do
+					read -p "What is the name of the database for this site (PROJECT_NAME): " SITE_DB_NAME
+				done
+			else
+				SITE_DB_NAME=$DB_NAME_CLEAN
+			fi
+
+			if [ "$DB_USER_PASS" == "" ]; then
+				read -p "What is the password for the dev db user? : " DB_USER_PASS
+			fi
+
+			case $DRUPAL_MAJOR_VERSION in
+				7)
+					SETTINGS_LOCATION="$PROJECTS_ROOT/$PROJ_DIR_NAME/$SITE_ROOT/sites/default"
+
+					# settings.php
+					cp "$SETTINGS_LOCATION/default.settings.php" "$SETTINGS_LOCATION/settings.php"
+
+					ALLOW_DRUPAL_INSTALL='y'
+					;;
+				8)
+					SETTINGS_LOCATION="$PROJECTS_ROOT/$PROJ_DIR_NAME/$SITE_ROOT/sites/default"
+
+					# settings.php
+					cp "$SETTINGS_LOCATION/default.settings.php" "$SETTINGS_LOCATION/settings.php"
+					cat "$BASE_DIR/resources/default.drupal8.end.settings.php" >> "$SETTINGS_LOCATION/settings.php"
+
+					# settings.local.php
+					cp "$BASE_DIR/resources/default.drupal8.settings.local.php" "$SETTINGS_LOCATION/default.settings.local.php"
+					DEV_SITE_URL="$BASE_SITE_DOMAIN.$DEV_SITE_DOMAIN"
+					sed "s/DB_NAME/$SITE_DB_NAME/g" "$BASE_DIR/resources/default.drupal8.settings.local.php" | sed "s/DEV_MYSQL_USER/$DB_USER/g" | sed "s/DEV_MYSQL_PASS/$DB_USER_PASS/g" | sed "s/FULL_SITE_URL/$DEV_SITE_URL/g" > "$SETTINGS_LOCATION/settings.local.php"
+
+					# services.yml
+					cp "$SETTINGS_LOCATION/default.services.yml" "$SETTINGS_LOCATION/services.yml"
+
+					# drushrc.php
+					cp "$BASE_DIR/resources/default.drupal8.drushrc.php" "$SETTINGS_LOCATION/default.drushrc.php"
+					sed "s/FULL_SITE_URL/$DEV_SITE_URL/g" "$BASE_DIR/resources/default.drupal8.settings.local.php" > "$SETTINGS_LOCATION/drushrc.php"
+
+					ALLOW_DRUPAL_INSTALL="y"
+					;;
+				*)
+					echo "Setup of drushrc and settings files is not supported for version $DRUPAL_MAJOR_VERSION.x"
+					;;
+			esac
+			break
+		elif [ "$ANSWER" == "n" ]; then
+			break
+		fi
+	done
 fi
 
+if [ "$ALLOW_DRUPAL_INSTALL" == "y" ]; then
+	while :
+	do
+		read -p "Do you want to install drupal now? (y/n) " ANSWER
+		if [ "$ANSWER" == "y" ]; then
+			open "http://$DEV_SITE_URL/core/install.php"
+			break
+		elif [ "$ANSWER" == "n" ]; then
+			echo "You can install the site now by going to http://$DEV_SITE_URL/core/install.php"
+			break
+		fi
+	done
+fi
 cd "$CURRENT_DIR"
 echo "Done!"
 exit 0
