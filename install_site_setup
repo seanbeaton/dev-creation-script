@@ -28,8 +28,8 @@ fi
 
 cp resources/default.settings.conf settings/settings.conf
 
-echo "DEFAULT_DB_SCRIPT='/app/dev-creation-script/resources/default.database_create.sql'" >> settings/settings.conf
-echo "DB_SCRIPT_LOCATION='/app/dev-creation-script/resources/projects'" >> settings/settings.conf
+echo "DEFAULT_DB_SCRIPT='$INSTALLER_DIR/resources/default.database_create.sql'" >> settings/settings.conf
+echo "DB_SCRIPT_LOCATION='$INSTALLER_DIR/resources/projects'" >> settings/settings.conf
 
 echo "You will need to add the correct settings in $INSTALLER_DIR/settings/settings.conf"
 
