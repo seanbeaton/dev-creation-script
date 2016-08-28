@@ -40,7 +40,7 @@ Sets the current live site of the site. If there currently isn't a live site, yo
 
 Sets the docroot of the project.
 
-`-s | --dev-site`
+`-s | --dev-site <project>`
 
 Set the lowest level domain of the site, for example `project` in `project.home.seanbeaton.com`
 
@@ -69,11 +69,11 @@ Usually, the mysql root user. Should be able to create new databases.
 
 The password for the mysql user provided by `--mysql-user`.
 
-`-t | --template-script-location`
+`-t | --template-script-location </path/to/my/template>`
 
 The location of the template script. This is provided by the settings.conf file, but if you want to structure the default file differently, you can change this variable. The default is usually `/app/dev-creation-script/resources/default.database_create.sql`.
 
-`-d | --db-scripts-location`
+`-d | --db-scripts-location </path/to/my/location>`
 
 The location for the generated sql scripts. This is provided by the settings.conf file, but if for some reason you want to change this location, you can use this variable. The default is usually `/app/dev-creation-script/resources/projects`.
 
