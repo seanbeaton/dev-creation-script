@@ -130,6 +130,7 @@ fi
 
 PROJECT_SCRIPT_LOCATION="$DB_SCRIPT_LOCATION/$DB_NAME_CLEAN.database_create.sql"
 
+echo "Mysql may require password..."
 sed "s/TMP_DEV_DB_NAME/$DB_NAME_CLEAN/g" "$DEFAULT_DB_SCRIPT" | sed "s/TMP_DEV_USERNAME/$DB_USER/g" > "$PROJECT_SCRIPT_LOCATION"
 mysql -u $MYSQL_USER -p$MYSQL_PASS < "$PROJECT_SCRIPT_LOCATION"
 echo "Created database."

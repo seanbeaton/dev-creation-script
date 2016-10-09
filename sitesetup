@@ -4,15 +4,22 @@ BASE_DIR="$(dirname "$(readlink "$0")")"
 
 source "$BASE_DIR/settings/settings.conf";
 
+CHECK_DRUPAL_SITE=1
 ALLOW_APACHE_CONF_CREATE=0
 ALLOW_DRUPAL_INSTALL="n"
 DRUPAL_PROJECT="n" # This'll be set to "y" later if we download the files.
 GIT_REGEX=$(echo "git@[a-zA-z\_\.-]+\:[a-zA-z\_\.-]+\/([a-zA-z\_\.-]+).git")
 VERSION_REGEX=$(echo "^([1-9A-Za-z]+)[\.|$]") #match the first number in a version number
-DB_NAME_REGEX=$(echo "[\"\'\%\$\#\@\.-]") #match the first number in a version number
+DB_NAME_REGEX=$(echo "^[a-zA-Z0-9_]+") #invalid chars
 ALLOW_PROJECT_FILES_SETUP=0 # This is used to see if we can download the files for drupal/whatever project
 CURRENT_DIR=`pwd`
 DB_NAME_CLEAN=''
+EXISTING_DB_PREFIX_POSSIBLE=0
+SHOW_DB_COMMANDS=0
+UNALLOWED_DB_NAME=''
+ALLOW_DIR_SKIP=0
+ALLOW_DIRECTORY_SET=1
+SITE_URL=''
 
 while :
 do
@@ -28,15 +35,40 @@ done
 
 while :
 do
-	read -p "Does the directory for this project already exist? (y/n) " ANSWER
+    if [ "$ALLOW_DIRECTORY_SET" == 1 ]; then
+	    read -p "Does the directory for this project already exist? (y/n) " ANSWER
+	else
+	    ANSWER="n"
+    fi
+
 	if [ "$ANSWER" == "y" ]; then
 		ALLOW_APACHE_CONF_CREATE=1;
-  		read -p "Enter the directory name for this project: " PROJ_DIR_NAME
-  		read -p "If the site root directory isn't htdocs, enter it now: " INPUT_SITE_ROOT
-		if [ "$INPUT_SITE_ROOT" != "" ]; then
-		  SITE_ROOT=$INPUT_SITE_ROOT
-		fi
-		break
+		while :
+		do
+		    read -p "Enter the directory name for this project: " ANSWER
+		    if [ -d "$PROJECTS_ROOT/$ANSWER" ]; then
+		        PROJ_DIR_NAME=$ANSWER
+		        break
+		    else
+		        echo "It doesn't seem like the directory $PROJECTS_ROOT/$ANSWER exists"
+		        if [ "$ALLOW_DIR_SKIP" == 1 ]; then
+		            echo "If you'd like to create a directory instead of providing an existing one, type skip."
+		            read -p "Otherwise, hit enter : " SKIP_ANSWER
+		            if [ "$SKIP_ANSWER" == 'skip' ]; then
+		                echo "Not creating directory."
+		                ALLOW_DIRECTORY_SET=0
+		                break
+		            fi
+		        fi
+		        ALLOW_DIR_SKIP=1
+		    fi
+		done
+
+		if [ "$ALLOW_DIRECTORY_SET" == 1 ]; then
+		    # If we're not creating a directory, we want to stay in the loop with the override on the answer above.
+		    break
+        fi
+
 	elif [ "$ANSWER" == "n" ]; then
 		while :
 		do
@@ -51,6 +83,8 @@ do
 						git clone "$GIT_URL"
 						PROJ_DIR_NAME=$(echo "${BASH_REMATCH[1]}")
 						ALLOW_APACHE_CONF_CREATE=1
+						DOWNLOADED_FROM_EXTERNAL_REPO=1
+						EXISTING_DB_PREFIX_POSSIBLE=1
 						break
 					else
 						echo "That doesn't seem to be a valid url. Try again."
@@ -69,6 +103,7 @@ do
 						mkdir "$PROJECTS_ROOT/$PROJ_DIR_NAME/db"
 						ALLOW_APACHE_CONF_CREATE=1
 						ALLOW_PROJECT_FILES_SETUP=1
+						CHECK_DRUPAL_SITE=0
 						git init "$PROJECTS_ROOT/$PROJ_DIR_NAME"
 						INPUT_SITE_ROOT='htdocs'
 						break
@@ -93,8 +128,24 @@ if [ "$ALLOW_PROJECT_FILES_SETUP" == 1 ]; then
 		read -p "Project type number: " PROJECT_TYPE
 		case $PROJECT_TYPE in
 			0) # Drupal
-				read -p "Please enter the drupal version you'd like to use: " DRUPAL_VERSION
-				dldrupal --download-version "$DRUPAL_VERSION" --download-location "$PROJECTS_ROOT/$PROJ_DIR_NAME/$SITE_ROOT"
+			    while :
+			    do
+                    read -p "Please enter the drupal version you'd like to use: " DRUPAL_VERSION
+                    dldrupal --download-version "$DRUPAL_VERSION" --download-location "$PROJECTS_ROOT/$PROJ_DIR_NAME/$SITE_ROOT"
+                    if [ $? -eq 1 ]; then
+                        while :
+                        do
+                            read -p "Would you like to try to download again with another version number? (y/n) : " ANSWER
+                            if [ "$ANSWER" == "y" ]; then
+                                break
+                            else
+                                break 2
+                            fi
+                        done
+                    else
+                        break
+                    fi
+			    done
 				DRUPAL_PROJECT="y";
 				[[ "$DRUPAL_VERSION" =~ $(echo "$VERSION_REGEX") ]]
 				DRUPAL_MAJOR_VERSION=$(echo "${BASH_REMATCH[1]}")
@@ -113,13 +164,48 @@ if [ "$ALLOW_PROJECT_FILES_SETUP" == 1 ]; then
 				;;
 		esac
 	done
+elif [ "$CHECK_DRUPAL_SITE" == 1 ]; then
+	while :
+	do
+		read -p "Is this a drupal site? (y/n) " ANSWER
+		if [ "$ANSWER" == "y" ]; then
+			DRUPAL_PROJECT="y";
+			read -p "Please enter the major drupal version (e.g. 7, 8) you are using: " DRUPAL_MAJOR_VERSION
+			break
+		elif [ "$ANSWER" == "n" ]; then
+			break
+		fi
+	done
+	if [ ! -d "$PROJECTS_ROOT/$PROJ_DIR_NAME/$SITE_ROOT" ]; then
+	    echo "The default root directory, $SITE_ROOT, was not found."
+        echo "Here are the contents of the project directory:"
+        ls -halp "$PROJECTS_ROOT/$PROJ_DIR_NAME"
+
+        while :
+        do
+            read -p "Please enter the root directory now: " SITE_ROOT
+            if [ -d "$PROJECTS_ROOT/$PROJ_DIR_NAME/$SITE_ROOT" ]; then
+                break
+            fi
+            echo "The directory $PROJECTS_ROOT/$PROJ_DIR_NAME/$SITE_ROOT doesn't seem to exist."
+        done
+
+    fi # If it's there, we're all good.
 fi
 
 PROJECT_NAME=$PROJ_DIR_NAME
 
 while :
 do
-	read -p "Update /etc/hosts file? (y/n) " ANSWER
+    RESULTS=$(grep ${PROJ_DIR_NAME} ${ETC_HOSTS_PATH})
+    if [ $? -eq 0 ]; then
+        echo ""
+        echo "You may already have an entry in your hosts file for this site. See the entry below."
+        echo ""
+        echo "$RESULTS"
+        echo ""
+    fi
+	read -p "Update /etc/hosts file? (y/n) : " ANSWER
 	BASE_SITE_DOMAIN=''
 	if [ "$ANSWER" == "y" ]; then
 		read -p "Enter the base site domain for this project, or hit enter to use $PROJ_DIR_NAME(.$DEV_SITE_DOMAIN): " BASE_SITE_DOMAIN
@@ -131,6 +217,7 @@ do
 			echo "127.0.0.1      $PROJ_DIR_NAME.$DEV_SITE_DOMAIN" | sudo tee -a $ETC_HOSTS_PATH > /dev/null
 			BASE_SITE_DOMAIN=$PROJ_DIR_NAME
 		fi
+		DEV_SITE_URL="$BASE_SITE_DOMAIN.$DEV_SITE_DOMAIN"
 		break
 	elif [ "$ANSWER" == "n" ]; then
 		BASE_SITE_DOMAIN=$PROJ_DIR_NAME
@@ -154,9 +241,99 @@ fi
 if [ "$DRUPAL_PROJECT" == "y" ]; then
 	while :
 	do
+	    DB_ALREADY_EXISTS=0
+	    ## Check if db already exists with name, if we have the pw.
+	    if [ "$MYSQL_PW" != "" ]; then
+			DB_NAME_CLEAN=$( echo "$PROJECT_NAME" | sed "s/$DB_NAME_REGEX/_/g" )
+
+			DB_SCRIPT_FILE="$DB_SCRIPT_LOCATION/$DB_NAME_CLEAN.db_exists.sql"
+
+			sed "s/DB_NAME/$DB_NAME_CLEAN/g" "$BASE_DIR/resources/db_exists.sql" > "$DB_SCRIPT_FILE"
+	        RESULT=$(mysql -sN -u $MYSQL_USER -p$MYSQL_PW < "$DB_SCRIPT_FILE")
+
+	        if [ -z "$RESULT" ]; then
+	            DB_ALREADY_EXISTS=0
+#	            echo "Database $DB_NAME_CLEAN does not exist. "
+            else
+                DB_ALREADY_EXISTS=1
+                UNALLOWED_DB_NAME=$DB_NAME_CLEAN
+                echo ""
+	            echo "A database currently exists with the name $DB_NAME_CLEAN."
+	            echo "If you wish to create a database (for example, if the existing database is"
+	            echo "from a different project) you will need to provide another name."
+                echo ""
+            fi
+	    fi
+
+        ##
 		read -p "Do you want to create a mysql database for this site? (y/n) " ANSWER
 		if [ "$ANSWER" == "y" ]; then
+
+			if [ "$DB_ALREADY_EXISTS" == 1 ]; then
+                while :
+                do
+                    read -p "Please enter a new database name. It must not be any current name : " INPUT_DB_NAME
+
+                    sed "s/DB_NAME/$INPUT_DB_NAME/g" "$BASE_DIR/resources/db_exists.sql" > "$DB_SCRIPT_FILE"
+                    RESULT=$(mysql -sN -u $MYSQL_USER -p$MYSQL_PW < "$DB_SCRIPT_FILE")
+
+                    if [ -z "$RESULT" ]; then
+
+                        # If it doesn't already exist, check to make sure it's a good db name.
+                        # If the user wishes, they can use a name that doesn't match the regex.
+
+                        [[ "$INPUT_DB_NAME" =~ $(echo "$DB_NAME_REGEX") ]]
+                        if [ "${BASH_REMATCH[0]}" != "$INPUT_DB_NAME" ]; then # Check if this seems like a good db name.
+                            echo "That doesn't seem to be a valid db name. Names should match the regex: $DB_NAME_REGEX"
+                            echo "Do you want to continue with the db name $INPUT_DB_NAME?"
+                            read -p "Type y to continue with this name, or anything else to try again. : " ANSWER
+                            if [ "$ANSWER" == "y" ]; then
+                                DB_NAME_CLEAN=$INPUT_DB_NAME
+                                break
+                            fi
+                        else
+                            if [ "$INPUT_DB_NAME" != "" ]; then
+                                DB_NAME_CLEAN=$INPUT_DB_NAME
+                                break
+                            fi
+                            echo "Database name must not be blank."
+                        fi
+                    else
+
+                        # A database with that name already exists. If the user fails picking a non-existent name
+                        # more than once, it will show a list of commands to skip database creation, or list current
+                        # databases.
+
+                        echo "A database currently exists with the name $INPUT_DB_NAME."
+                        echo "You may not use the same name as an existing database."
+                        if [ "$SHOW_DB_COMMANDS" == 1 ]; then
+                            echo "Commands -"
+                            echo "    s - skip database creation"
+                            echo "    l - list current databases"
+                            echo "    Anything else - try again"
+                            read -p "Command: (s/l/*) : " COMMAND
+                            if [ "$COMMAND" == "s" ]; then
+                                SKIP_DATABASE_CREATION=1
+                                DB_NAME_CLEAN=""
+                                break
+                            elif [ "$COMMAND" == "l" ]; then
+                                echo "Listing databases:"
+                                mysql -sN -u $MYSQL_USER -p$MYSQL_PW -e "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA"
+                            fi
+                        else
+                            SHOW_DB_COMMANDS=1
+                        fi
+                    fi
+
+                done
+			fi
+
+            if [ "$SKIP_DATABASE_CREATION" == 1 ]; then
+                break
+            fi
+
 			DB_NAME_CLEAN=$( echo "$PROJECT_NAME" | sed "s/$DB_NAME_REGEX/_/g" )
+
 			if [ "$MYSQL_PW" == "" ]; then
 				read -s -p "Mysql PW was not provided in the settings file, please provide now: " MYSQL_PW
 				echo ""
@@ -173,13 +350,71 @@ if [ "$DRUPAL_PROJECT" == "y" ]; then
 		read -p "Do you want to set up the drushrc and settings files? (y/n) " ANSWER
 		if [ "$ANSWER" == "y" ]; then
 
-			if [ "$DB_NAME_CLEAN" == "" ]; then
-				while :
-				do
-					read -p "What is the name of the database for this site (PROJECT_NAME): " SITE_DB_NAME
-				done
-			else
-				SITE_DB_NAME=$DB_NAME_CLEAN
+            if [ "$DB_NAME_CLEAN" == "" ]; then # We don't have a clean DB name yet, so ask for it.
+                while :
+                do
+                    read -p "What is the (clean) name of the database for this site? ($PROJECT_NAME): " INPUT_DB_NAME
+
+                    [[ "$INPUT_DB_NAME" =~ $(echo "$DB_NAME_REGEX") ]]
+                    if [ "${BASH_REMATCH[0]}" == "$INPUT_DB_NAME" ]; then
+                        DB_NAME_CLEAN=$INPUT_DB_NAME
+                        break
+                    else
+                        echo "That doesn't seem to be a valid db name. Names should match the regex: $DB_NAME_REGEX"
+                        echo "Do you want to continue with the db name $INPUT_DB_NAME?"
+                        read -p "Type y to continue with this name, or anything else to try again. : " ANSWER
+                        if [ "$ANSWER" == "y" ]; then
+                            DB_NAME_CLEAN=$INPUT_DB_NAME
+                            break
+                        fi
+                    fi
+                done
+            fi
+            SITE_DB_NAME=$DB_NAME_CLEAN
+
+            if [ "$EXISTING_DB_PREFIX_POSSIBLE" == 1 ]; then
+                echo "If the repo you downloaded contains a db snapshot, "
+                if [ "$DB_PREFIX" == "" ]; then
+                    read -p "and it uses a table prefix, please enter it now. Default: (<none>) : " DB_PREFIX
+                else
+                    read -p "and it uses a table prefix, please enter it now. Default: ($DB_PREFIX) : " INPUT
+                    if [ "$INPUT" != "" ]; then
+                        DB_PREFIX=$INPUT
+                    fi # No need to set it if it's not changing.
+                fi
+            else
+                while :
+                do
+                    if [ "$DB_PREFIX" == "" ]; then
+                        echo "Do you want to use a table prefix in your database? This will"
+                        read -p "be placed in the drupal settings file. (y/n) : " ANSWER
+                        if [ "$ANSWER" == "y" ]; then
+                            read -p "Enter the prefix now: " DB_PREFIX
+                            break
+                        elif [ "$ANSWER" == "n" ]; then
+                            break
+                        fi
+                    else
+                        echo "Do you want to use a table prefix in your database? This will"
+                        read -p "be placed in the drupal settings file. (y/n) : " ANSWER
+                        if [ "$ANSWER" == "y" ]; then
+                            read -p "Enter the prefix now: Default ($DB_PREFIX)" INPUT
+                            if [ "$INPUT" != "" ]; then
+                                DB_PREFIX=$INPUT
+                            fi
+                            break
+                        elif [ "$ANSWER" == "n" ]; then
+                            echo "Not using a prefix."
+                            DB_PREFIX=''
+                            break
+                        fi
+                    fi
+                done
+			fi
+
+			if [ "$DEV_SITE_URL" == "" ]; then
+			    echo "What is the url for the site? This will be used for"
+			    read -p "the default URI for the site settings : " DEV_SITE_URL
 			fi
 
 			if [ "$DB_USER_PASS" == "" ]; then
@@ -192,6 +427,11 @@ if [ "$DRUPAL_PROJECT" == "y" ]; then
 
 					# settings.php
 					cp "$SETTINGS_LOCATION/default.settings.php" "$SETTINGS_LOCATION/settings.php"
+					sed "s/DB_NAME/$SITE_DB_NAME/g" "$BASE_DIR/resources/default.drupal7.end.settings.php" | sed "s/DEV_MYSQL_USER/$DB_USER/g" | sed "s/DEV_MYSQL_PASS/$DB_USER_PASS/g" | sed "s/DB_PREFIX/$DB_PREFIX/g" >> "$SETTINGS_LOCATION/settings.php"
+
+                    # drushrc.php
+					cp "$BASE_DIR/resources/default.drupal7.drushrc.php" "$SETTINGS_LOCATION/default.drushrc.php"
+					sed "s/FULL_SITE_URL/$DEV_SITE_URL/g" "$BASE_DIR/resources/default.drupal7.drushrc.php" > "$SETTINGS_LOCATION/drushrc.php"
 
 					ALLOW_DRUPAL_INSTALL='y'
 					;;
@@ -204,15 +444,15 @@ if [ "$DRUPAL_PROJECT" == "y" ]; then
 
 					# settings.local.php
 					cp "$BASE_DIR/resources/default.drupal8.settings.local.php" "$SETTINGS_LOCATION/default.settings.local.php"
-					DEV_SITE_URL="$BASE_SITE_DOMAIN.$DEV_SITE_DOMAIN"
-					sed "s/DB_NAME/$SITE_DB_NAME/g" "$BASE_DIR/resources/default.drupal8.settings.local.php" | sed "s/DEV_MYSQL_USER/$DB_USER/g" | sed "s/DEV_MYSQL_PASS/$DB_USER_PASS/g" | sed "s/FULL_SITE_URL/$DEV_SITE_URL/g" > "$SETTINGS_LOCATION/settings.local.php"
+#					DEV_SITE_URL="$BASE_SITE_DOMAIN.$DEV_SITE_DOMAIN"
+					sed "s/DB_NAME/$SITE_DB_NAME/g" "$BASE_DIR/resources/default.drupal8.settings.local.php" | sed "s/DEV_MYSQL_USER/$DB_USER/g" | sed "s/DEV_MYSQL_PASS/$DB_USER_PASS/g" | sed "s/FULL_SITE_URL/$DEV_SITE_URL/g" | sed "s/DB_PREFIX/$DB_PREFIX/g" > "$SETTINGS_LOCATION/settings.local.php"
 
 					# services.yml
 					cp "$SETTINGS_LOCATION/default.services.yml" "$SETTINGS_LOCATION/services.yml"
 
 					# drushrc.php
 					cp "$BASE_DIR/resources/default.drupal8.drushrc.php" "$SETTINGS_LOCATION/default.drushrc.php"
-					sed "s/FULL_SITE_URL/$DEV_SITE_URL/g" "$BASE_DIR/resources/default.drupal8.settings.local.php" > "$SETTINGS_LOCATION/drushrc.php"
+					sed "s/FULL_SITE_URL/$DEV_SITE_URL/g" "$BASE_DIR/resources/default.drupal8.drushrc.php" > "$SETTINGS_LOCATION/drushrc.php"
 
 					ALLOW_DRUPAL_INSTALL="y"
 					;;
