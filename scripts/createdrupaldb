@@ -29,7 +29,7 @@ do
 		shift
 		;;
 		-p|--mysql-password)
-		MYSQL_PASS=$2
+		MYSQL_PW=$2
 		shift
 		;;
 		-t|--template-script-location)
@@ -102,8 +102,8 @@ if [ "$MYSQL_USER" == "" ]; then
 	done
 fi
 
-if [ "MYSQL_PASS" == "" ]; then
-	read -s -p "Mysql pw for $MYSQL_USER not provided, please provide it now: " MYSQL_PASS
+if [ "MYSQL_PW" == "" ]; then
+	read -s -p "Mysql pw for $MYSQL_USER not provided, please provide it now: " MYSQL_PW
 fi
 
 if [ "$DEFAULT_DB_SCRIPT" == "" ]; then
@@ -132,7 +132,7 @@ PROJECT_SCRIPT_LOCATION="$DB_SCRIPT_LOCATION/$DB_NAME_CLEAN.database_create.sql"
 
 echo "Mysql may require password..."
 sed "s/TMP_DEV_DB_NAME/$DB_NAME_CLEAN/g" "$DEFAULT_DB_SCRIPT" | sed "s/TMP_DEV_USERNAME/$DB_USER/g" > "$PROJECT_SCRIPT_LOCATION"
-mysql -u $MYSQL_USER -p$MYSQL_PASS < "$PROJECT_SCRIPT_LOCATION"
+mysql -u $MYSQL_USER -p$MYSQL_PW < "$PROJECT_SCRIPT_LOCATION" 2>/dev/null
 echo "Created database."
 echo "db name: $DB_NAME_CLEAN"
 echo "db user: $DB_USER"
